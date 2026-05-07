@@ -64,17 +64,15 @@ header .logo-fallback {
 }
 
 /* Views — each fills the viewport as its own screen */
-.view { display: none; position: fixed; inset: 0; overflow-y: auto; }
+.view { display: none; position: fixed; inset: 0; overflow-y: auto; z-index: 10; }
 .view.active { display: block; }
 
 /* === INTRO VIEW === */
 #view-intro {
   background: var(--darker);
-  display: flex;
-  flex-direction: column;
 }
 #view-intro .intro-body {
-  flex: 1;
+  min-height: calc(100vh - 73px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -125,8 +123,6 @@ header .logo-fallback {
 /* === VOTE VIEW === */
 #view-vote {
   background: var(--darker);
-  display: flex;
-  flex-direction: column;
   padding-bottom: 120px;
 }
 #view-vote header { border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -341,12 +337,10 @@ textarea.comment-field::placeholder { color: rgba(255,255,255,0.25); }
 #view-thanks {
   background: var(--light-bg);
   color: var(--body-text);
-  display: flex;
-  flex-direction: column;
 }
 #view-thanks header { background: var(--darker); }
 .thanks-body {
-  flex: 1;
+  min-height: calc(100vh - 73px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -383,8 +377,6 @@ textarea.comment-field::placeholder { color: rgba(255,255,255,0.25); }
 /* === RECOVER VIEW === */
 #view-recover {
   background: var(--darker);
-  display: flex;
-  flex-direction: column;
 }
 .recover-body {
   max-width: 560px;
@@ -901,7 +893,7 @@ async function confirmSubmit() {
 
   const rankComments = {};
   ranked.forEach((id, i) => {
-    if (chipComments[id]) rankComments[i + 1] = chipComments[id];
+    if (chipComments[id]) rankComments[String(i + 1)] = chipComments[id];
   });
 
   const payload = {
