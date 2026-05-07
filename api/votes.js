@@ -1,4 +1,4 @@
-import { put, list } from '@vercel/blob';
+import { put, head } from '@vercel/blob';
 
 // ── Configuration ────────────────────────────────────────────────────────
 // Update BLOB_TOKEN_ENV to match the exact env var name Vercel assigns
@@ -15,12 +15,10 @@ function getToken() {
 async function readVotes() {
   const token = getToken();
   try {
-    const { blobs } = await list({ prefix: BLOB_PATHNAME, token });
-    if (!blobs || blobs.length === 0) return [];
-    const blobUrl = blobs[0].url;
-    const res = await fetch(blobUrl, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    // Use head() + downloadUrl to bypass CDN caching on public blob stores
+    const blob = await head(BLOB_PATHNAME, { token });
+    if (!blob) return [];
+    const res = await fetch(blob.downloadUrl, { cache: 'no-store' });
     if (!res.ok) return [];
     return await res.json();
   } catch {
