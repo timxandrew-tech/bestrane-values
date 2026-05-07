@@ -46,7 +46,7 @@ function sanitiseVote(body) {
   const allowed = new Set(['mastery', 'adaptable', 'genuine', 'driven', 'grounded']);
   const ranked = body.ranked
     .filter(id => typeof id === 'string' && allowed.has(id))
-    .slice(0, 4);
+    .slice(0, 5);
   if (ranked.length === 0) return null;
 
   const rankComments = {};

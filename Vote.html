@@ -63,8 +63,8 @@ header .logo-fallback {
   display: none;
 }
 
-/* Views */
-.view { display: none; min-height: 100vh; }
+/* Views — each fills the viewport as its own screen */
+.view { display: none; position: fixed; inset: 0; overflow-y: auto; }
 .view.active { display: block; }
 
 /* === INTRO VIEW === */
@@ -131,10 +131,16 @@ header .logo-fallback {
 }
 #view-vote header { border-bottom: 1px solid rgba(255,255,255,0.06); }
 .vote-container {
-  max-width: 680px;
+  max-width: 1200px;
   margin: 0 auto;
   width: 100%;
   padding: 32px 20px;
+}
+#cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 0;
 }
 .vote-instructions {
   font-size: 0.875rem;
@@ -149,8 +155,6 @@ header .logo-fallback {
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 10px;
-  margin-bottom: 12px;
-  overflow: hidden;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .value-card.ranked {
@@ -249,11 +253,10 @@ header .logo-fallback {
 .chevron-btn:hover { color: rgba(255,255,255,0.8); }
 .chevron-btn.open { transform: rotate(180deg); }
 .card-body {
-  display: none;
+  display: block;
   padding: 0 16px 16px;
   border-top: 1px solid rgba(255,255,255,0.06);
 }
-.card-body.open { display: block; }
 .card-description {
   font-size: 0.9rem;
   color: rgba(255,255,255,0.65);
@@ -340,7 +343,6 @@ textarea.comment-field::placeholder { color: rgba(255,255,255,0.25); }
   color: var(--body-text);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
 }
 #view-thanks header { background: var(--darker); }
 .thanks-body {
@@ -433,7 +435,6 @@ textarea.comment-field::placeholder { color: rgba(255,255,255,0.25); }
   background: var(--darker);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
 }
 .results-container {
   max-width: 800px;
@@ -712,7 +713,7 @@ input.secret-input:focus {
     <span class="logo-fallback">BESTRANE</span>
   </header>
   <div class="vote-container">
-    <p class="vote-instructions">Tap a value name to <strong>rank it</strong>. Tap the &#8964; chevron to expand and read more. Rank up to <strong>4 values</strong> in order of preference.</p>
+    <p class="vote-instructions">Tap a value name to <strong>rank it</strong>. You must rank <strong>all 5 values</strong> from most to least important. Your #1 is most important.</p>
 
     <div id="cards-container"></div>
 
@@ -859,7 +860,16 @@ const VALUES = [
 // ── State ──────────────────────────────────────────────────────────────────
 let ranked = [];        // array of value ids in rank order (rank 1 first)
 let chipComments = {};  // id -> comment string (any value)
-let expandedCards = new Set();
+let shuffledValues = [];  // randomised display order, set when voting starts
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 // ── Routing ────────────────────────────────────────────────────────────────
 function navigate(hash) {
@@ -877,6 +887,7 @@ function router() {
     setProgress(0);
   } else if (hash === 'vote') {
     showView('vote');
+    if (shuffledValues.length === 0) shuffledValues = shuffleArray(VALUES);
     renderCards();
     setProgress(40);
   } else if (hash === 'thanks') {
@@ -903,7 +914,8 @@ function router() {
 
 function showView(name) {
   const el = document.getElementById('view-' + name);
-  if (el) el.classList.add('active');
+  if (el) { el.classList.add('active'); el.scrollTop = 0; }
+  window.scrollTo(0, 0);
 }
 
 function setProgress(pct) {
@@ -947,7 +959,8 @@ function renderCards() {
   if (!container) return;
   container.innerHTML = '';
 
-  VALUES.forEach(v => {
+  const displayValues = shuffledValues.length > 0 ? shuffledValues : VALUES;
+  displayValues.forEach(v => {
     const rankPos = ranked.indexOf(v.id);  // -1 if not ranked
     const isRanked = rankPos >= 0;
     const isExpanded = expandedCards.has(v.id);
@@ -964,8 +977,8 @@ function renderCards() {
     // Vote button
     const voteBtn = isRanked
       ? `<button class="btn-vote voted" onclick="unvote('${v.id}', event)">Ranked #${rankPos+1}</button>`
-      : (ranked.length >= 4
-          ? `<button class="btn-vote" disabled title="Max 4 values" style="opacity:0.35;cursor:not-allowed">Rank</button>`
+      : (ranked.length >= 5
+          ? `<button class="btn-vote" disabled title="All 5 ranked" style="opacity:0.35;cursor:not-allowed">Rank</button>`
           : `<button class="btn-vote" onclick="vote('${v.id}', event)">Rank</button>`);
 
     // Alt tags
@@ -1041,12 +1054,12 @@ function vote(id, e) {
     renderCards();
     return;
   }
-  if (ranked.length >= 4) return;
+  if (ranked.length >= 5) return;
   ranked.push(id);
   expandedCards.add(id);
   saveDraft();
   renderCards();
-  setProgress(20 + ranked.length * 15);
+  setProgress(20 + ranked.length * 16);
 }
 
 function unvote(id, e) {
@@ -1059,12 +1072,14 @@ function unvote(id, e) {
 
 function updateSubmitBtn() {
   const btn = document.getElementById('submit-btn');
-  if (btn) btn.disabled = ranked.length === 0;
+  if (!btn) return;
+  btn.disabled = ranked.length < 5;
+  btn.title = ranked.length < 5 ? `Rank all 5 values (${ranked.length}/5 done)` : '';
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────
 function openConfirmModal() {
-  if (ranked.length === 0) return;
+  if (ranked.length < 5) return;
   const list = document.getElementById('modal-ranked-list');
   list.innerHTML = ranked.map((id, i) => {
     const v = VALUES.find(x => x.id === id);
@@ -1090,7 +1105,7 @@ async function confirmSubmit() {
 
   const payload = {
     ts: new Date().toISOString(),
-    ranked: ranked.slice(0, 4),
+    ranked: ranked.slice(0, 5),
     rankComments,
     chipComments,
     other: (document.getElementById('other-thoughts')?.value || '').slice(0, 2000)
@@ -1237,22 +1252,23 @@ async function fetchAndRenderResults(secret) {
 function renderResults(votes, container) {
   if (!Array.isArray(votes)) votes = [];
 
-  // Scoring: rank1=4pts, rank2=3pts, rank3=2pts, rank4=1pt
+  // Scoring: rank1=5pts, rank2=4pts, rank3=3pts, rank4=2pts, rank5=1pt
   const scoreMap = {};
   const rankCounts = {};  // id -> { 1:n, 2:n, 3:n, 4:n }
   const allComments = {};  // id -> [strings]
   const otherResponses = [];
 
-  VALUES.forEach(v => {
+  const displayValues = shuffledValues.length > 0 ? shuffledValues : VALUES;
+  displayValues.forEach(v => {
     scoreMap[v.id] = 0;
-    rankCounts[v.id] = {1:0,2:0,3:0,4:0};
+    rankCounts[v.id] = {1:0,2:0,3:0,4:0,5:0};
     allComments[v.id] = [];
   });
 
   votes.forEach(vote => {
     if (!vote.ranked) return;
     vote.ranked.forEach((id, i) => {
-      const pts = 4 - i;  // rank1=4, rank2=3, rank3=2, rank4=1
+      const pts = 5 - i;  // rank1=5, rank2=4, rank3=3, rank4=2, rank5=1
       if (scoreMap[id] !== undefined) {
         scoreMap[id] += pts;
         rankCounts[id][i+1] = (rankCounts[id][i+1] || 0) + 1;
@@ -1298,7 +1314,7 @@ function renderResults(votes, container) {
       </div>
       <div class="score-bar-bg"><div class="score-bar-fill" style="width:${pct}%"></div></div>
       <div class="rank-breakdown">
-        ${[1,2,3,4].map(r => `<div class="rank-pill">Rank ${r}: <span>${rc[r] || 0}</span></div>`).join('')}
+        ${[1,2,3,4,5].map(r => `<div class="rank-pill">Rank ${r}: <span>${rc[r] || 0}</span></div>`).join('')}
       </div>
       ${commentsHTML}
     </div>`;
