@@ -1,10 +1,10 @@
-import { put, head } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 
 // ── Configuration ────────────────────────────────────────────────────────
 // Update BLOB_TOKEN_ENV to match the exact env var name Vercel assigns
 // when you create your Blob store (e.g. BLOB_PUB_READ_WRITE_TOKEN)
 const BLOB_TOKEN_ENV = 'BLOB_READ_WRITE_TOKEN';
-const BLOB_PATHNAME  = 'md_votes_v1.json';
+const BLOB_PREFIX    = 'md_votes_v1/';   // each vote is its own file — no race conditions
 const SECRET         = 'bestrane2026results';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -12,29 +12,39 @@ function getToken() {
   return process.env[BLOB_TOKEN_ENV];
 }
 
-async function readVotes() {
+// Each vote stored as md_votes_v1/{ts}-{rand}.json — POST only writes,
+// GET lists + fetches all. No read-modify-write = no race conditions.
+async function writeVote(vote) {
   const token = getToken();
-  try {
-    // Use head() + downloadUrl to bypass CDN caching on public blob stores
-    const blob = await head(BLOB_PATHNAME, { token });
-    if (!blob) return [];
-    const res = await fetch(blob.downloadUrl, { cache: 'no-store' });
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
-}
-
-async function writeVotes(votes) {
-  const token = getToken();
-  await put(BLOB_PATHNAME, JSON.stringify(votes), {
+  const rand  = Math.random().toString(36).slice(2, 8);
+  const name  = `${BLOB_PREFIX}${Date.now()}-${rand}.json`;
+  await put(name, JSON.stringify(vote), {
     access: 'public',
     addRandomSuffix: false,
-    allowOverwrite: true,
     contentType: 'application/json',
     token
   });
+}
+
+async function readVotes() {
+  const token = getToken();
+  try {
+    const { blobs } = await list({ prefix: BLOB_PREFIX, token });
+    if (!blobs || blobs.length === 0) return [];
+    const results = await Promise.all(
+      blobs.map(async blob => {
+        try {
+          const res = await fetch(blob.downloadUrl || blob.url);
+          return res.ok ? await res.json() : null;
+        } catch { return null; }
+      })
+    );
+    return results
+      .filter(Boolean)
+      .sort((a, b) => (a.ts || '').localeCompare(b.ts || ''));
+  } catch {
+    return [];
+  }
 }
 
 function sanitiseVote(body) {
@@ -73,7 +83,6 @@ function sanitiseVote(body) {
 
 // ── Handler ───────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  // CORS headers for local dev
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-results-secret');
@@ -82,7 +91,6 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
-  // ── POST: submit a vote ───────────────────────────────────────────────
   if (req.method === 'POST') {
     let body = req.body;
     if (typeof body === 'string') {
@@ -95,9 +103,7 @@ export default async function handler(req, res) {
     }
 
     try {
-      const votes = await readVotes();
-      votes.push(vote);
-      await writeVotes(votes);
+      await writeVote(vote);
       return res.status(200).json({ ok: true });
     } catch (err) {
       console.error('Error saving vote:', err);
@@ -105,7 +111,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── GET: retrieve all votes ───────────────────────────────────────────
   if (req.method === 'GET') {
     const headerSecret = req.headers['x-results-secret'];
     const querySecret  = req.query?.secret;
