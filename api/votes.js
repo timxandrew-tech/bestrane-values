@@ -3,7 +3,7 @@ import { put, list } from '@vercel/blob';
 // ── Configuration ────────────────────────────────────────────────────────
 // Update BLOB_TOKEN_ENV to match the exact env var name Vercel assigns
 // when you create your Blob store (e.g. BLOB_PUB_READ_WRITE_TOKEN)
-const BLOB_TOKEN_ENV = 'BLOB_PUB_READ_WRITE_TOKEN';
+const BLOB_TOKEN_ENV = 'BLOB_READ_WRITE_TOKEN';
 const BLOB_PATHNAME  = 'md_votes_v1.json';
 const SECRET         = 'bestrane2024results';
 
