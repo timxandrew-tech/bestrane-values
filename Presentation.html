@@ -86,6 +86,21 @@ header svg { height: 30px; width: auto; }
   border: 1px solid rgba(255,138,61,0.25);
   color: rgba(255,138,61,0.9);
 }
+
+.cta-btn {
+  display: inline-block;
+  background: var(--orange);
+  color: var(--white);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 15px 42px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background 0.18s ease, transform 0.1s ease;
+}
+.cta-btn:hover { background: var(--orange-deep); transform: translateY(-1px); }
+
 </style>
 </head>
 <body>
@@ -157,5 +172,10 @@ header svg { height: 30px; width: auto; }
     </div>
   </div>
 </div>
+
+<div style="text-align:center; margin: 48px auto 0; max-width:900px; padding:0 24px 60px;">
+  <a href="/Vote.html" class="cta-btn">Begin Voting &rarr;</a>
+</div>
+
 </body>
 </html>

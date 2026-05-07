@@ -521,7 +521,7 @@ textarea.comment-field::placeholder { color: rgba(255,255,255,0.25); }
   </header>
   <div class="intro-body">
     <h1>Vote for your<br><span>Bestrane Values</span></h1>
-    <p>You will see five candidate values. Rank up to four in order of preference — your top choice first. You can add a comment to any value, and there is a free-text field at the end for any other thoughts. Your vote is anonymous.</p>
+    <p>You will see five candidate values. Rank all five in order of preference with your top choice first, and so on. You can add a comment to any value, and there is a free-text field at the end for any other thoughts. Your vote is anonymous.</p>
     <button class="btn-primary" onclick="navigate('vote')">Begin Voting</button>
   </div>
 </div>
@@ -662,6 +662,7 @@ const VALUES = [
 // ── State ──────────────────────────────────────────────────────────────────
 let ranked = [];        // array of value ids in rank order (rank 1 first)
 let chipComments = {};  // id -> comment string (any value)
+let expandedCards  = new Set();  // unused for visibility (CSS forces open) but prevents ReferenceError
 let shuffledValues = [];  // randomised display order, set when voting starts
 
 function shuffleArray(arr) {
