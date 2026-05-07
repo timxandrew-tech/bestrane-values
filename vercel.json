@@ -1,5 +1,24 @@
 {
   "redirects": [
-    { "source": "/", "destination": "/Vote.html", "permanent": false }
+    {
+      "source": "/",
+      "destination": "/Vote.html",
+      "permanent": false
+    },
+    {
+      "source": "/presentation.html",
+      "destination": "/Presentation.html",
+      "permanent": false
+    },
+    {
+      "source": "/vote.html",
+      "destination": "/Vote.html",
+      "permanent": false
+    },
+    {
+      "source": "/results",
+      "destination": "/results.html",
+      "permanent": false
+    }
   ]
 }

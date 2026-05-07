@@ -422,6 +422,34 @@ textarea.comment-field::placeholder { color: rgba(255,255,255,0.25); }
 }
 .recover-name { font-weight: 600; color: rgba(255,255,255,0.9); }
 
+
+.rank-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 7px 32px 7px 14px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  min-width: 110px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.rank-select:focus { outline: none; border-color: var(--orange); }
+.rank-select.has-rank {
+  border-color: var(--orange);
+  color: var(--orange);
+  background-color: rgba(255,138,61,0.1);
+}
+.rank-select option { background: #1A2229; color: rgba(255,255,255,0.85); }
+.rank-select option:disabled { color: rgba(255,255,255,0.25); }
+
 /* Modal */
 .modal-overlay {
   position: fixed;
@@ -660,7 +688,7 @@ const VALUES = [
 ];
 
 // ── State ──────────────────────────────────────────────────────────────────
-let ranked = [];        // array of value ids in rank order (rank 1 first)
+let rankings   = {};    // id -> rank number (1-5); replaces ordered array
 let chipComments = {};  // id -> comment string (any value)
 let expandedCards  = new Set();  // unused for visibility (CSS forces open) but prevents ReferenceError
 let shuffledValues = [];  // randomised display order, set when voting starts
@@ -725,7 +753,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Draft persistence ──────────────────────────────────────────────────────
 function saveDraft() {
   const data = {
-    ranked,
+    rankings,
     chipComments,
     other: document.getElementById('other-thoughts')?.value || ''
   };
@@ -737,10 +765,14 @@ function loadDraft() {
     const raw = localStorage.getItem(DRAFT_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
-    ranked = Array.isArray(data.ranked) ? data.ranked : [];
+    if (data.rankings && typeof data.rankings === 'object') {
+      rankings = {};
+      Object.entries(data.rankings).forEach(([id, r]) => {
+        if (r) rankings[id] = parseInt(r, 10);
+      });
+    }
     chipComments = (data.chipComments && typeof data.chipComments === 'object') ? data.chipComments : {};
-    // other thoughts restored after render
-  } catch(e) { ranked = []; chipComments = {}; }
+  } catch(e) { rankings = {}; chipComments = {}; }
 }
 
 function clearDraft() {
@@ -755,25 +787,24 @@ function renderCards() {
 
   const displayValues = shuffledValues.length > 0 ? shuffledValues : VALUES;
   displayValues.forEach(v => {
-    const rankPos = ranked.indexOf(v.id);  // -1 if not ranked
-    const isRanked = rankPos >= 0;
-    const isExpanded = expandedCards.has(v.id);
+    const myRank  = rankings[v.id] || null;
+    const isRanked = !!myRank;
 
     const card = document.createElement('div');
     card.className = 'value-card' + (isRanked ? ' ranked' : '');
     card.id = 'card-' + v.id;
 
-    // Badge
-    const badgeHTML = isRanked
-      ? `<div class="rank-badge visible">${rankPos + 1}</div>`
+    // Rank badge
+    const badgeHTML = myRank
+      ? `<div class="rank-badge visible">${myRank}</div>`
       : `<div class="rank-badge-placeholder"></div>`;
 
-    // Vote button
-    const voteBtn = isRanked
-      ? `<button class="btn-vote voted" onclick="unvote('${v.id}', event)">Ranked #${rankPos+1}</button>`
-      : (ranked.length >= 5
-          ? `<button class="btn-vote" disabled title="All 5 ranked" style="opacity:0.35;cursor:not-allowed">Rank</button>`
-          : `<button class="btn-vote" onclick="vote('${v.id}', event)">Rank</button>`);
+    // Rank dropdown — taken ranks disabled in other dropdowns
+    const takenRanks = new Set(Object.entries(rankings).filter(([id]) => id !== v.id).map(([,r]) => r));
+    const dropdownHTML = `<select class="rank-select${myRank ? ' has-rank' : ''}" onchange="setRank('${v.id}', this.value)">
+      <option value="">— Rank —</option>
+      ${[1,2,3,4,5].map(n => `<option value="${n}"${myRank === n ? ' selected' : ''}${takenRanks.has(n) ? ' disabled' : ''}>${n}</option>`).join('')}
+    </select>`;
 
     // Alt tags
     const tagsHTML = v.alts.map(a => `<span class="alt-tag">${a}</span>`).join('');
@@ -790,18 +821,12 @@ function renderCards() {
     card.innerHTML = `
       <div class="card-header">
         ${badgeHTML}
-        <span class="card-name" onclick="vote('${v.id}', event)">${v.name}</span>
+        <span class="card-name">${v.name}</span>
         <div class="card-actions">
-          ${voteBtn}
-          ${isRanked ? `<button class="btn-unvote" onclick="unvote('${v.id}', event)">Remove</button>` : ''}
-          <button class="chevron-btn${isExpanded ? ' open' : ''}" onclick="toggleExpand('${v.id}', event)" aria-label="Expand">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
+          ${dropdownHTML}
         </div>
       </div>
-      <div class="card-body${isExpanded ? ' open' : ''}" id="body-${v.id}">
+      <div class="card-body" id="body-${v.id}">
         <p class="card-description">${v.desc}</p>
         <div class="alt-tags">${tagsHTML}</div>
         ${commentHTML}
@@ -830,54 +855,39 @@ function updateComment(id, val) {
   saveDraft();
 }
 
-function toggleExpand(id, e) {
-  if (e) e.stopPropagation();
-  if (expandedCards.has(id)) {
-    expandedCards.delete(id);
+// toggleExpand removed — cards always expanded via CSS
+
+function setRank(id, val) {
+  if (!val) {
+    delete rankings[id];
   } else {
-    expandedCards.add(id);
+    rankings[id] = parseInt(val, 10);
   }
-  renderCards();
-}
-
-function vote(id, e) {
-  if (e) e.stopPropagation();
-  if (ranked.includes(id)) {
-    // Already ranked — just expand the card
-    expandedCards.add(id);
-    renderCards();
-    return;
-  }
-  if (ranked.length >= 5) return;
-  ranked.push(id);
-  expandedCards.add(id);
   saveDraft();
   renderCards();
-  setProgress(20 + ranked.length * 16);
+  const n = Object.values(rankings).filter(Boolean).length;
+  setProgress(20 + n * 16);
 }
 
-function unvote(id, e) {
-  if (e) e.stopPropagation();
-  ranked = ranked.filter(r => r !== id);
-  saveDraft();
-  renderCards();
-  setProgress(20 + ranked.length * 15);
-}
+
 
 function updateSubmitBtn() {
   const btn = document.getElementById('submit-btn');
   if (!btn) return;
-  btn.disabled = ranked.length < 5;
-  btn.title = ranked.length < 5 ? `Rank all 5 values (${ranked.length}/5 done)` : '';
+  const n = Object.values(rankings).filter(Boolean).length;
+  btn.disabled = n < 5;
+  btn.title = n < 5 ? `Rank all 5 values (${n}/5 done)` : '';
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────
 function openConfirmModal() {
-  if (ranked.length < 5) return;
+  const n = Object.values(rankings).filter(Boolean).length;
+  if (n < 5) return;
   const list = document.getElementById('modal-ranked-list');
-  list.innerHTML = ranked.map((id, i) => {
-    const v = VALUES.find(x => x.id === id);
-    return `<div class="modal-item"><div class="modal-rank">${i+1}</div><div class="modal-name">${v.name}</div></div>`;
+  list.innerHTML = [1,2,3,4,5].map(rank => {
+    const id = Object.keys(rankings).find(rid => rankings[rid] === rank);
+    const v  = VALUES.find(x => x.id === id);
+    return `<div class="modal-item"><div class="modal-rank">${rank}</div><div class="modal-name">${v ? v.name : '?'}</div></div>`;
   }).join('');
   document.getElementById('confirm-modal').classList.add('open');
 }
@@ -892,6 +902,9 @@ async function confirmSubmit() {
   btn.disabled = true;
   btn.textContent = 'Submitting...';
 
+  // Build ranked array in rank order from rankings map
+  const ranked = [1,2,3,4,5].map(n => Object.keys(rankings).find(id => rankings[id] === n)).filter(Boolean);
+
   const rankComments = {};
   ranked.forEach((id, i) => {
     if (chipComments[id]) rankComments[String(i + 1)] = chipComments[id];
@@ -899,7 +912,7 @@ async function confirmSubmit() {
 
   const payload = {
     ts: new Date().toISOString(),
-    ranked: ranked.slice(0, 5),
+    ranked,
     rankComments,
     chipComments,
     other: (document.getElementById('other-thoughts')?.value || '').slice(0, 2000)
