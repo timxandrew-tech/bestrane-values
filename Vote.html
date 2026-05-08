@@ -653,6 +653,7 @@ textarea.comment-field::placeholder { color: rgba(255,255,255,0.25); }
 // ── Constants ──────────────────────────────────────────────────────────────
 const DRAFT_KEY      = 'md_votes_draft_v1';
 const LOCAL_KEY      = 'md_votes_local_v1';
+const VOTED_KEY      = 'md_voted_v1';
 
 const VALUES = [
   {
@@ -713,10 +714,14 @@ function router() {
   // hide all views
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
 
+  const alreadyVoted = localStorage.getItem(VOTED_KEY) === 'true';
+
   if (!hash || hash === '') {
+    if (alreadyVoted) { showView('thanks'); setProgress(100); return; }
     showView('intro');
     setProgress(0);
   } else if (hash === 'vote') {
+    if (alreadyVoted) { showView('thanks'); setProgress(100); return; }
     showView('vote');
     if (shuffledValues.length === 0) shuffledValues = shuffleArray(VALUES);
     renderCards();
@@ -942,6 +947,7 @@ async function confirmSubmit() {
     } catch(e) {}
   }
 
+  try { localStorage.setItem(VOTED_KEY, 'true'); } catch(e) {}
   clearDraft();
   closeConfirmModal();
   navigate('thanks');

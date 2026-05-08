@@ -281,11 +281,14 @@ const VALUES = [
 
 let _votes = [];
 
-// Auto-unlock if ?secret= in URL
+// Auto-unlock if ?secret= in URL or sessionStorage has valid secret
 window.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
-  const s = params.get('secret') || '';
+  const urlSecret = params.get('secret') || '';
+  const storedSecret = sessionStorage.getItem('md_results_secret') || '';
+  const s = urlSecret || storedSecret;
   if (s === SECRET) {
+    if (s !== storedSecret) sessionStorage.setItem('md_results_secret', s);
     document.getElementById('gate').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     fetchAndRender(s);
@@ -299,6 +302,7 @@ async function unlock() {
     errEl.style.display = 'block';
     return;
   }
+  sessionStorage.setItem('md_results_secret', val);
   errEl.style.display = 'none';
   document.getElementById('gate').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
@@ -398,14 +402,34 @@ function esc(s) {
 
 function exportCSV() {
   if (!_votes.length) return;
-  const rows = [['Timestamp','Rank1','Rank2','Rank3','Rank4','Rank5','OtherThoughts']];
-  _votes.forEach(v => rows.push([
-    v.ts || '',
-    v.ranked?.[0] || '', v.ranked?.[1] || '',
-    v.ranked?.[2] || '', v.ranked?.[3] || '',
-    v.ranked?.[4] || '',
-    (v.other || '').replace(/"/g, '""')
-  ]));
+  const valueIds = ['mastery','adaptable','genuine','driven','grounded'];
+  const headers = [
+    'Timestamp',
+    'Rank1','Rank2','Rank3','Rank4','Rank5',
+    'Comment_Rank1','Comment_Rank2','Comment_Rank3','Comment_Rank4','Comment_Rank5',
+    'Comment_mastery','Comment_adaptable','Comment_genuine','Comment_driven','Comment_grounded',
+    'OtherThoughts'
+  ];
+  const rows = [headers];
+  _votes.forEach(v => {
+    const rc = v.rankComments || {};
+    const cc = v.chipComments || {};
+    rows.push([
+      v.ts || '',
+      v.ranked?.[0] || '', v.ranked?.[1] || '', v.ranked?.[2] || '', v.ranked?.[3] || '', v.ranked?.[4] || '',
+      (rc['1'] || '').replace(/"/g, '""'),
+      (rc['2'] || '').replace(/"/g, '""'),
+      (rc['3'] || '').replace(/"/g, '""'),
+      (rc['4'] || '').replace(/"/g, '""'),
+      (rc['5'] || '').replace(/"/g, '""'),
+      (cc['mastery']   || '').replace(/"/g, '""'),
+      (cc['adaptable'] || '').replace(/"/g, '""'),
+      (cc['genuine']   || '').replace(/"/g, '""'),
+      (cc['driven']    || '').replace(/"/g, '""'),
+      (cc['grounded']  || '').replace(/"/g, '""'),
+      (v.other || '').replace(/"/g, '""')
+    ]);
+  });
   const csv  = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url  = URL.createObjectURL(blob);
